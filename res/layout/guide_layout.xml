@@ -22,7 +22,7 @@
             android:layout_height="wrap_content"
             android:text="Analyze"
             android:id="@+id/analyze_button" android:layout_gravity="center_horizontal"/>
-    <ImageView
+    <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/test_display" android:layout_gravity="center_horizontal" android:layout_margin="20dip"

@@ -2,6 +2,9 @@ package com.noahgolmant.ImageToText;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -10,20 +13,24 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
+import com.googlecode.tesseract.android.TessBaseAPI;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
  * Created by Noah on 6/20/2014.
  */
-public class GuideActivity extends Activity {
+public class GuideActivity extends Activity implements DecodeTask.DecodeInterface{
 
     private Button createPhotoButton;
     private Button cropButton;
     private Button analyzeButton;
+    private TextView textDisplay;
     private Uri currentImage;
 
     private ImageView img;
@@ -35,6 +42,11 @@ public class GuideActivity extends Activity {
     private static final int CROP_IMAGE_ACTIVITY_REQUEST_CODE    = 101;
     private static final int ROTATE_IMAGE_ACTIVITY_REQUEST_CODE  = 102;
 
+    private static final int CAPTURE_DONE_FLAG = 0x01;
+    private static final int CROP_DONE_FLAG = 0x02;
+
+    private int imageProcessFlag = 0x0000;
+
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.guide_layout);
@@ -42,9 +54,13 @@ public class GuideActivity extends Activity {
         createPhotoButton = (Button) findViewById(R.id.photo_button);
         cropButton = (Button) findViewById(R.id.crop_button);
         analyzeButton = (Button) findViewById(R.id.analyze_button);
-        img = (ImageView) findViewById(R.id.test_display);
+        textDisplay = (TextView) findViewById(R.id.test_display);
 
         initializeListeners();
+
+        if(getIntent().hasExtra(MediaStore.EXTRA_OUTPUT)) {
+            currentImage = (Uri) getIntent().getExtras().get(MediaStore.EXTRA_OUTPUT);
+        }
     }
 
     private void initializeListeners() {
@@ -65,7 +81,7 @@ public class GuideActivity extends Activity {
         analyzeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                img.setImageURI(currentImage);
+                startTextExtraction();
             }
         });
     }
@@ -83,11 +99,14 @@ public class GuideActivity extends Activity {
 
         // start the image capture Intent
         startActivityForResult(intent, CAPTURE_IMAGE_ACTIVITY_REQUEST_CODE);
+
+        //imageProcessFlag &= CAPTURE_DONE_FLAG;
     }
 
     private void startImageCrop() {
 
-        if(currentImage == null)
+        if(currentImage == null)// ||
+        //        (imageProcessFlag & CAPTURE_DONE_FLAG) != CAPTURE_DONE_FLAG)
             return;
 
         Intent cropIntent = new Intent("com.android.camera.action.CROP");
@@ -103,13 +122,24 @@ public class GuideActivity extends Activity {
         cropIntent.putExtra(MediaStore.EXTRA_OUTPUT, currentImage);
         //start the activity - we handle returning in onActivityResult
         startActivityForResult(cropIntent, CROP_IMAGE_ACTIVITY_REQUEST_CODE);
+
+        imageProcessFlag &= CROP_DONE_FLAG;
     }
 
     private void startTextExtraction() {
-        if(currentImage == null)
+        if(currentImage == null)/* ||
+                (imageProcessFlag & CAPTURE_DONE_FLAG) != CAPTURE_DONE_FLAG ||
+                (imageProcessFlag & CROP_DONE_FLAG) != CROP_DONE_FLAG)*/
             return;
 
+        DecodeTask task = new DecodeTask(this);
+        task.intent = this;
+        task.execute(currentImage);
+    }
 
+    public void useExtractedText(String text) {
+        this.textDisplay.setText(text);
+        Log.d("ImageToText", "set text to " + text);
     }
 
     /**

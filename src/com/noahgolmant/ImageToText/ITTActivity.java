@@ -1,8 +1,10 @@
 package com.noahgolmant.ImageToText;
 
 import android.app.Activity;
-import android.content.Context;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -10,13 +12,12 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.*;
+import com.noahgolmant.ImageToText.camera.CameraActivity;
 import org.opencv.android.OpenCVLoader;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 
 public class ITTActivity extends Activity {
 
@@ -49,6 +50,7 @@ public class ITTActivity extends Activity {
         initializeWidgets();
         initializeListeners();
 
+        checkCameraHardware();
         loadResources();
 
         //File tessDir = new File(getFilesDir(), "tessdata");
@@ -57,6 +59,27 @@ public class ITTActivity extends Activity {
         //File tessLang = new File(tessDir, "tesseract-ocr-3.02.eng.tar.gz");
         //new DownloadTask(this, tessLang).execute("https://tesseract-ocr.googlecode.com/files/tesseract-ocr-3.02.eng.tar.gz");
 
+    }
+
+    /** Check if this device has a camera */
+    private boolean checkCameraHardware() {
+        if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
+            // this device has a cameram continue
+            return true;
+        } else {
+            // no camera on this device, construct an alert dialog instance to inform the user.
+            new AlertDialog.Builder(this)
+                    .setTitle("No Camera Detected")
+                    .setMessage("ImageToText detected no camera on this device.")
+                    .setNeutralButton("OK", new AlertDialog.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            // Disable the photo button
+                            startNewPhotoButton.setEnabled(false);
+                        }
+                    });
+            return false;
+        }
     }
 
     /**
@@ -135,15 +158,23 @@ public class ITTActivity extends Activity {
     }
 
     private void startGuidedPhoto() {
-        Intent guideIntent = new Intent(this, GuideActivity.class);
+        //Intent guideIntent = new Intent(this, GuideActivity.class);
+        Intent guideIntent = new Intent();
+        guideIntent.setClassName(getApplicationContext(), "com.noahgolmant.ImageToText.camera.CameraActivity");
         super.onResume();
         startActivity(guideIntent);
     }
 
     private void startGuidedPhoto(Uri image) {
-        Intent guideIntent = new Intent(this, GuideActivity.class);
+         /*Intent guideIntent = new Intent(this, GuideActivity.class);
         guideIntent.putExtra(MediaStore.EXTRA_OUTPUT, image);
 
+        super.onResume();
+        startActivity(guideIntent);*/
+
+        // TEMP
+        Intent guideIntent = new Intent();
+        guideIntent.setClassName(getApplicationContext(), "com.noahgolmant.ImageToText.camera.CameraActivity");
         super.onResume();
         startActivity(guideIntent);
     }

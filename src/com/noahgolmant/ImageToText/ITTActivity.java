@@ -204,6 +204,4 @@ public class ITTActivity extends Activity {
         }
     }
 
-
-
 }

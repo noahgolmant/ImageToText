@@ -44,10 +44,13 @@ public class DecodeTask extends AsyncTask<Bitmap, Void, String> {
         Mat mat = new Mat();
         Utils.bitmapToMat(img, mat);
         //Mat mat = Highgui.imread(params[0].getPath());
+
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
+
         Core.bitwise_not(mat, mat); // invert the colors
 
-        //double thresh = 200, color = 255;
-        //Imgproc.threshold(mat, mat, thresh, color, Imgproc.THRESH_BINARY);
+        double thresh = 200, color = 255;
+        Imgproc.threshold(mat, mat, thresh, color, Imgproc.THRESH_BINARY);
 
         //Highgui.imwrite(params[0].getPath(), mat);
         //Bitmap img = BitmapFactory.decodeFile(params[0].getPath()).copy(Bitmap.Config.ARGB_8888, true);
@@ -70,4 +73,6 @@ public class DecodeTask extends AsyncTask<Bitmap, Void, String> {
     protected void onPostExecute(String result) {
         intent.useExtractedText(result);
     }
+
+
 }

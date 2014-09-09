@@ -1,6 +1,7 @@
 package com.noahgolmant.ImageToText.camera;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -17,6 +18,11 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import com.noahgolmant.ImageToText.DecodeTask;
 import com.noahgolmant.ImageToText.R;
+import com.noahgolmant.ImageToText.ResultActivity;
+import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -84,8 +90,8 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
         decoder.execute(currentImage);
 
         captureButton.setEnabled(false);
-        //camera.startPreview();
-        //isPreviewOn = true;
+        camera.startPreview();
+        isPreviewOn = true;
     }
 
     @Override
@@ -100,9 +106,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
                 currentX = (int) event.getX();
                 currentY = (int) event.getY();
-
-                if(!isPreviewOn)
-                    camera.startPreview();
 
                 break;
             //If the single pointer is moved, update the rect accordingly.
@@ -130,6 +133,12 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
         // Only draw a new selection area if it is bigger than the given threshold.
         if(selectionRect.height() * selectionRect.width() >= MIN_SELECTION_AREA) {
+
+            if(!isPreviewOn && (event.getAction() == MotionEvent.ACTION_MOVE || event.getAction() == MotionEvent.ACTION_DOWN)) {
+                camera.startPreview();
+                isPreviewOn = true;
+            }
+
             selection.redraw(); //re-draws the canvas with the rect
 
             // check if the hardware comes with focus capabilities
@@ -151,8 +160,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
             // after we're focused, stop the preview if we just stopped making the rect
             if(event.getAction() == MotionEvent.ACTION_UP) {
                 camera.takePicture(null, null, this);
-                camera.stopPreview();
-                isPreviewOn = false;
+
             }
         }
 
@@ -167,6 +175,9 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
     @Override
 
     public void onPictureTaken(byte[] data, Camera camera) {
+
+        camera.stopPreview();
+        isPreviewOn = false;
 
         Matrix rotateMatrix = new Matrix();
 
@@ -197,6 +208,32 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
     @Override
     public void useExtractedText(String text) {
+        Intent resultIntent = new Intent();
+        resultIntent.setClass(this, ResultActivity.class);
+
+        resultIntent.putExtra("extracted", text);
+
+        // begin image pre-processing by applying threshold and inverting the colors
+        Mat mat = new Mat();
+        Utils.bitmapToMat(currentImage, mat);
+
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
+
+        //Mat mat = Highgui.imread(params[0].getPath());
+        Core.bitwise_not(mat, mat); // invert the colors
+
+        double thresh = 200, color = 255;
+        Imgproc.threshold(mat, mat, thresh, color, Imgproc.THRESH_BINARY);
+
+        //Highgui.imwrite(params[0].getPath(), mat);
+        //Bitmap img = BitmapFactory.decodeFile(params[0].getPath()).copy(Bitmap.Config.ARGB_8888, true);
+
+        // set the bitmap back to our modified matrix
+        Utils.matToBitmap(mat, currentImage);
+
+        resultIntent.putExtra("image", currentImage);
+
+        this.startActivity(resultIntent);
         Log.d("ImageToText", "USED EXTRACTED: " + text);
     }
 

@@ -16,12 +16,16 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ProgressBar;
+import com.googlecode.leptonica.android.JpegIO;
 import com.noahgolmant.ImageToText.DecodeTask;
 import com.noahgolmant.ImageToText.R;
 import com.noahgolmant.ImageToText.ResultActivity;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
@@ -38,12 +42,13 @@ import java.util.List;
  */
 public class CameraActivity extends Activity implements View.OnClickListener, View.OnTouchListener, Camera.PictureCallback, DecodeTask.DecodeInterface {
 
-    private static int MIN_SELECTION_AREA = 100;
+    private static int MIN_SELECTION_AREA = 400;
 
     private Camera camera;
     private CameraPreview preview;
     private SelectionView selection;
     private Button captureButton;
+    private FrameLayout previewFrame;
 
     private Bitmap currentImage = null;
 
@@ -64,7 +69,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
         // Create our Preview view and set it as the content of our activity.
         preview = new CameraPreview(this, camera);
-        FrameLayout previewFrame = (FrameLayout) findViewById(R.id.camera_preview);
+        previewFrame = (FrameLayout) findViewById(R.id.camera_preview);
         previewFrame.addView(preview);
 
         // Initialize the selection overlay view
@@ -79,19 +84,14 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
         captureButton = (Button) findViewById(R.id.capture_text_button);
         captureButton.setOnClickListener(this);
 
-        captureButton.setEnabled(false);
+        captureButton.setEnabled(true);
 
     }
 
     @Override
     public void onClick(View v) {
-        DecodeTask decoder = new DecodeTask(this);
-        decoder.intent = this;
-        decoder.execute(currentImage);
 
-        captureButton.setEnabled(false);
-        camera.startPreview();
-        isPreviewOn = true;
+       camera.takePicture(null, null, this);
     }
 
     @Override
@@ -134,10 +134,10 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
         // Only draw a new selection area if it is bigger than the given threshold.
         if(selectionRect.height() * selectionRect.width() >= MIN_SELECTION_AREA) {
 
-            if(!isPreviewOn && (event.getAction() == MotionEvent.ACTION_MOVE || event.getAction() == MotionEvent.ACTION_DOWN)) {
-                camera.startPreview();
-                isPreviewOn = true;
-            }
+            //if(!isPreviewOn && (event.getAction() == MotionEvent.ACTION_MOVE || event.getAction() == MotionEvent.ACTION_DOWN)) {
+            //    camera.startPreview();
+            //    isPreviewOn = true;
+            //}
 
             selection.redraw(); //re-draws the canvas with the rect
 
@@ -146,29 +146,53 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
                 return true;
 
             // if it does, set our current focus area to our selection rect with a heavy weight (1-1000).
-            ArrayList<Camera.Area> focusAreas = new ArrayList<Camera.Area>() {{
-                new Camera.Area(selectionRect, 2000);
-            }};
+            ArrayList<Camera.Area> focusAreas = new ArrayList<Camera.Area>();
+           // focusAreas.add(new Camera.Area(getSelectionFocusRect(), 1000));
 
             Camera.Parameters focusParams = camera.getParameters();
 
             focusParams.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            //focusParams.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
             focusParams.setFocusAreas(focusAreas);
 
-            camera.setParameters(focusParams);
 
-            // after we're focused, stop the preview if we just stopped making the rect
-            if(event.getAction() == MotionEvent.ACTION_UP) {
-                camera.takePicture(null, null, this);
-
+            Camera.Size maxSize = camera.getParameters().getPictureSize();
+            for(Camera.Size s : camera.getParameters().getSupportedPictureSizes()) {
+                if(s.height * s.width >= maxSize.height * maxSize.width)
+                    maxSize = s;
             }
+            focusParams.setPictureSize(maxSize.width,maxSize.height);
+            camera.setParameters(focusParams);
         }
 
         return true;
     }
 
+    // normalize the selectionRect values and convert to new 2D grid where (0,0) is center and (-1000, -1000) is top left
+    // normalize: abs( (value-min) / (max - min) )
+    // then multiply this percentage by abs(max - min) + min to move into the new coordinate system
+    // in this case abs(max - min) + min is abs(1000 - -1000) + -1000 = 1000
+    private Rect getSelectionFocusRect() {
+
+        Rect retRect = new Rect(-50, -50, 50, 50);
+
+        if(selectionRect.width() * selectionRect.height() >= MIN_SELECTION_AREA) {
+
+            int focusLeft = Float.valueOf(((float)selectionRect.left/ previewFrame.getWidth()) * 2000 - 1000).intValue();
+            int focusTop  = Float.valueOf(((float)selectionRect.top/ previewFrame.getHeight()) * 2000 - 1000).intValue();
+            int focusRight = Float.valueOf(((float)selectionRect.right/ previewFrame.getWidth()) * 2000 - 1000).intValue();
+            int focusBottom  = Float.valueOf(((float)selectionRect.bottom/ previewFrame.getHeight()) * 2000 - 1000).intValue();
+
+            retRect.set(focusLeft, focusTop, focusRight, focusBottom);
+        }
+
+        Log.d("ImageToText", String.format("%d,%d,%d,%d", retRect.left, retRect.top, retRect.right, retRect.bottom));
+
+        return retRect;
+    }
+
     public Rect getSelectionRect() {
-        Log.d("ImageToText", String.format("%d,%d,%d,%d", selectionRect.left, selectionRect.top, selectionRect.right, selectionRect.bottom));
+        //Log.d("ImageToText", String.format("%d,%d,%d,%d", selectionRect.left, selectionRect.top, selectionRect.right, selectionRect.bottom));
         return selectionRect;
     }
 
@@ -181,60 +205,89 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
         Matrix rotateMatrix = new Matrix();
 
-        Bitmap originalImg = BitmapFactory.decodeByteArray(data, 0, data.length);
+        Bitmap imgData = BitmapFactory.decodeByteArray(data, 0, data.length);
+        rotateMatrix.postRotate(90);
+        Bitmap originalImg = Bitmap.createBitmap(imgData, 0, 0, imgData.getWidth(), imgData.getHeight(), rotateMatrix, true);
 
         float widthScaleFactor = 1;
         float heightScaleFactor = 1;
 
-        if(originalImg.getHeight() >= originalImg.getWidth()) {
-            widthScaleFactor = (float)originalImg.getWidth() / (float)selection.getWidth();
-            heightScaleFactor = (float)originalImg.getHeight() / (float)selection.getHeight();
-            rotateMatrix.postRotate(0);
-        } else {
-            widthScaleFactor = (float)originalImg.getHeight() / (float)selection.getWidth();
-            heightScaleFactor = (float)originalImg.getWidth() / (float)selection.getHeight();
-            rotateMatrix.postRotate(90);
-        }
+        widthScaleFactor = (float)originalImg.getWidth() / (float)selection.getWidth();
+        heightScaleFactor = (float)originalImg.getHeight() / (float)selection.getHeight();
+        rotateMatrix.postRotate(-90);
 
         currentImage = Bitmap.createBitmap(originalImg,
-                (int)(selectionRect.left*widthScaleFactor),
-                (int)(selectionRect.top*heightScaleFactor),
-                (int)(selectionRect.width()*widthScaleFactor),
-                (int)(selectionRect.height()*heightScaleFactor),
+                getConvertedCoord(selectionRect.left, previewFrame.getWidth(), originalImg.getWidth()),
+                getConvertedCoord(selectionRect.top, previewFrame.getHeight(), originalImg.getHeight()),
+                getConvertedCoord(selectionRect.width(), previewFrame.getWidth(), originalImg.getWidth()),
+                getConvertedCoord(selectionRect.height(), previewFrame.getHeight(), originalImg.getHeight()),
                 rotateMatrix, true);
 
-        captureButton.setEnabled(true);
+        Log.d("ImageToText", String.format("Left: %d, Top: %d, Width: %d, Height: %d, previewFrame width: %d, previewFrame height: %d, originalImg width: %d, originialImg height: %d",
+                selectionRect.left, selectionRect.top, selectionRect.width(), selectionRect.height(), previewFrame.getWidth(), previewFrame.getHeight(),
+                originalImg.getWidth(), originalImg.getHeight()));
+
+        originalImg.recycle();
+
+        DecodeTask decoder = new DecodeTask(this);
+        decoder.intent = this;
+        decoder.execute(currentImage);
+
+        captureButton.setEnabled(false);
+
+    }
+
+
+    public String extractedText = null;
+
+    // normalizes the selection coord and then converts it to the bitmap size
+    private int getConvertedCoord(int selectionCoord, int selectionMax, int conversionMax) {
+        return Float.valueOf(((float)selectionCoord) / selectionMax * conversionMax ).intValue();
     }
 
     @Override
     public void useExtractedText(String text) {
         Intent resultIntent = new Intent();
         resultIntent.setClass(this, ResultActivity.class);
-
+        this.extractedText = text;
         resultIntent.putExtra("extracted", text);
 
         // begin image pre-processing by applying threshold and inverting the colors
-        Mat mat = new Mat();
-        Utils.bitmapToMat(currentImage, mat);
+//        Mat mat = new Mat();
+//        Utils.bitmapToMat(currentImage, mat);
+//
+//        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
+//
+//        double alpha = 1.3;
+//        double beta = 6.0;
+//        for (int i = 0; i < mat.rows(); i++) {
+//            for (int j = 0; j < mat.cols(); j++) {
+//                double[] val = new double[] { alpha * mat.get(i,j)[0] + beta };
+//
+//                mat.put(i,j, val);
+//            }
+//        }
+//
+//        //Highgui.imwrite(params[0].getPath(), mat);
+//        //Bitmap img = BitmapFactory.decodeFile(params[0].getPath()).copy(Bitmap.Config.ARGB_8888, true);
+//
+//        // set the bitmap back to our modified matrix
+//        Utils.matToBitmap(mat, currentImage);
 
-        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
-
-        //Mat mat = Highgui.imread(params[0].getPath());
-        Core.bitwise_not(mat, mat); // invert the colors
-
-        double thresh = 200, color = 255;
-        Imgproc.threshold(mat, mat, thresh, color, Imgproc.THRESH_BINARY);
-
-        //Highgui.imwrite(params[0].getPath(), mat);
-        //Bitmap img = BitmapFactory.decodeFile(params[0].getPath()).copy(Bitmap.Config.ARGB_8888, true);
-
-        // set the bitmap back to our modified matrix
-        Utils.matToBitmap(mat, currentImage);
-
-        resultIntent.putExtra("image", currentImage);
+        //resultIntent.putExtra("image", currentImage);
 
         this.startActivity(resultIntent);
         Log.d("ImageToText", "USED EXTRACTED: " + text);
+
+        super.onPause();
+        if (camera != null) {
+            camera.stopPreview();
+            camera.release();
+            camera = null;
+        }
+
+
+        this.finish();
     }
 
     // Static method to get our camera, checks if it's in use or otherwise unavailable

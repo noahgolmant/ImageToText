@@ -7,22 +7,6 @@
     <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
-        <Button
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Take New Photo"
-                android:id="@+id/startNewPhotoButton" android:layout_alignParentTop="true" android:layout_centerHorizontal="true"
-                android:layout_marginTop="36dp"/>
-        <Button android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Clear Photos"
-                android:id="@+id/clearPhotosButton" android:layout_alignParentTop="true"
-                android:layout_marginTop="36dp"/>
-        <ListView
-                android:layout_width="wrap_content"
-                android:layout_height="400dip"
-                android:id="@+id/listView"
-                android:layout_alignParentStart="true"
-                android:layout_alignParentBottom="true" android:visibility="visible"/>
     </RelativeLayout>
 </LinearLayout>
 

@@ -13,23 +13,22 @@ import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import com.noahgolmant.ImageToText.camera.CameraActivity;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.opencv.android.OpenCVLoader;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 
-public class ITTActivity extends Activity {
+public class ITTActivity extends Activity implements DownloadTask.DownloadInterface {
 
     /**
      * Widgets and items interacted with in the main window.
      */
-    private Button startNewPhotoButton;
-    private Button clearPhotoButton;
-    private ListView previousImageListView;
-
-    private ArrayList<Uri> previousImages = new ArrayList<Uri>();
-    private ImageAdapter previousImageAdapter;
+    //private Button startNewPhotoButton;
+    private String loadedJSON;
 
     /**
      * Listeners to call when a button or object is selected.
@@ -46,18 +45,56 @@ public class ITTActivity extends Activity {
 
         OpenCVLoader.initDebug();
 
-        fillImageList();
         initializeWidgets();
         initializeListeners();
 
         checkCameraHardware();
-        loadResources();
 
-        //File tessDir = new File(getFilesDir(), "tessdata");
-        //tessDir.mkdirs();
+        loadedJSON = loadJSONFromAsset();
 
-        //File tessLang = new File(tessDir, "tesseract-ocr-3.02.eng.tar.gz");
-        //new DownloadTask(this, tessLang).execute("https://tesseract-ocr.googlecode.com/files/tesseract-ocr-3.02.eng.tar.gz");
+        try {
+            JSONObject json = new JSONObject(loadedJSON);
+            String urlString  = json.getString("English");
+
+            String fileName = urlString.substring(urlString.lastIndexOf('/') + 1).replace(".gz", "");
+
+            File data = new File(Environment.getExternalStorageDirectory().toString() + "/tessdata/" + fileName);
+
+            if(!data.exists()) {
+                DownloadTask initDownload = new DownloadTask(this);
+                initDownload.intent = this;
+                initDownload.execute("English");
+            } else {
+                startGuidedPhoto();
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String loadJSONFromAsset() {
+        String json = null;
+        try {
+
+            InputStream is = this.getAssets().open("languages.json");
+
+            int size = is.available();
+
+            byte[] buffer = new byte[size];
+
+            is.read(buffer);
+
+            is.close();
+
+            json = new String(buffer, "UTF-8");
+
+
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return null;
+        }
+        return json;
 
     }
 
@@ -75,7 +112,7 @@ public class ITTActivity extends Activity {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
                             // Disable the photo button
-                            startNewPhotoButton.setEnabled(false);
+                            //startNewPhotoButton.setEnabled(false);
                         }
                     });
             return false;
@@ -86,75 +123,44 @@ public class ITTActivity extends Activity {
      * Initialization methods.
      */
 
-    private void loadResources() {
-        try {
-            for (String s : getAssets().list("tess")) {
-                Log.d("ImageToText", s);
-                File res = new File(getFilesDir(), "tessdata" + File.separator + s);
-                if(!res.exists())
-                    new LoadResourceTask(this).execute(s);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     private void initializeWidgets() {
         // Initialize widgets
-        startNewPhotoButton = (Button) findViewById(R.id.startNewPhotoButton);
-        previousImageListView   = (ListView) findViewById(R.id.listView);
+        //startNewPhotoButton = (Button) findViewById(R.id.startNewPhotoButton);
+        //previousImageListView   = (ListView) findViewById(R.id.listView);
 
-        clearPhotoButton = (Button) findViewById(R.id.clearPhotosButton);
+        //clearPhotoButton = (Button) findViewById(R.id.clearPhotosButton);
 
         // Init ListView array adapter that manages the ListView's data
-        previousImageAdapter = new ImageAdapter(this, R.layout.image_row_entry, previousImages);
-        previousImageListView.setAdapter(previousImageAdapter);
+        //previousImageAdapter = new ImageAdapter(this, R.layout.image_row_entry, previousImages);
+        //previousImageListView.setAdapter(previousImageAdapter);
     }
 
     private void initializeListeners() {
         // Listener called when the "new photo" button is pressed down.
-        newPhotoButtonListener = new View.OnClickListener() {
+        /*newPhotoButtonListener = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startGuidedPhoto();
             }
         };
-        startNewPhotoButton.setOnClickListener(newPhotoButtonListener);
+        startNewPhotoButton.setOnClickListener(newPhotoButtonListener);*/
 
-        clearPhotoButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clearPhotoEntries();
-            }
-        });
+//        clearPhotoButton.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                clearPhotoEntries();
+//            }
+//        });
 
         // Listener called when a previous picture in the picture's ListView is selected.
         // This will go to the rotate activity unless we already have aligned and cropped it.
-        previousImageListView.setOnItemClickListener(new ListView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view,
-                                    int position, long id) {
-                startGuidedPhoto(previousImages.get(position));
-            }
-        });
-    }
-
-    private void clearPhotoEntries() {
-        // Local media storage for the specific app
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "ImageToText");
-
-        // If we don't have the directory, ain't no images to use.
-        // The folder will be created once a new image is taken.
-        if(!mediaStorageDir.exists())
-            return;
-
-        // Iterate through any files in the folder and add their corresponding URI to our images array.
-        for(File image : mediaStorageDir.listFiles()) {
-            image.delete();
-        }
-
-        previousImages.clear();
+//        previousImageListView.setOnItemClickListener(new ListView.OnItemClickListener() {
+//            @Override
+//            public void onItemClick(AdapterView<?> parent, View view,
+//                                    int position, long id) {
+//                startGuidedPhoto(previousImages.get(position));
+//            }
+//        });
     }
 
     private void startGuidedPhoto() {
@@ -165,43 +171,8 @@ public class ITTActivity extends Activity {
         startActivity(guideIntent);
     }
 
-    private void startGuidedPhoto(Uri image) {
-         /*Intent guideIntent = new Intent(this, GuideActivity.class);
-        guideIntent.putExtra(MediaStore.EXTRA_OUTPUT, image);
-
-        super.onResume();
-        startActivity(guideIntent);*/
-
-        // TEMP
-        Intent guideIntent = new Intent();
-        guideIntent.setClassName(getApplicationContext(), "com.noahgolmant.ImageToText.camera.CameraActivity");
-        super.onResume();
-        startActivity(guideIntent);
+    @Override
+    public void useDownload() {
+        startGuidedPhoto();
     }
-
-    /**
-     * Populates the ArrayList with all image URIs to fill the ListView
-     */
-    private void fillImageList() {
-        // Start with a fresh new ArrayList to populate
-        if(previousImages == null)
-            previousImages = new ArrayList<Uri>();
-        else
-            previousImages.clear();
-
-        // Local media storage for the specific app
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "ImageToText");
-
-        // If we don't have the directory, ain't no images to use.
-        // The folder will be created once a new image is taken.
-        if(!mediaStorageDir.exists())
-            return;
-
-        // Iterate through any files in the folder and add their corresponding URI to our images array.
-        for(File image : mediaStorageDir.listFiles()) {
-            previousImages.add(Uri.fromFile(image));
-        }
-    }
-
 }

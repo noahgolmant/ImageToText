@@ -9,6 +9,7 @@ import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
 import com.googlecode.tesseract.android.TessBaseAPI;
+import com.memetix.mst.language.Language;
 import org.opencv.android.Utils;
 import org.opencv.core.*;
 import org.opencv.engine.OpenCVEngineInterface;
@@ -16,6 +17,8 @@ import org.opencv.highgui.Highgui;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by noahg_000 on 7/3/2014.
@@ -26,6 +29,8 @@ public class DecodeTask extends AsyncTask<Bitmap, Void, String> {
     private TessBaseAPI baseAPI;
     private ProgressDialog progDialog;
 
+    private Language fromLang;
+
     private static double THRESHOLD_DELTA = 8.0;
 
     // interface to interact with main intent
@@ -35,9 +40,11 @@ public class DecodeTask extends AsyncTask<Bitmap, Void, String> {
 
     public DecodeInterface intent = null;
 
-    public DecodeTask(Context context) {
+    public DecodeTask(Context context, Language fromLang) {
         this.context = context;
         this.baseAPI = new TessBaseAPI();
+
+        this.fromLang = fromLang;
     }
 
     @Override
@@ -146,17 +153,26 @@ public class DecodeTask extends AsyncTask<Bitmap, Void, String> {
         // Get working directory.
         //baseAPI.init(context.getFilesDir().toString(), "eng");
         File sdcard = Environment.getExternalStorageDirectory();
-        baseAPI.init(sdcard.toString(), "eng");
+        baseAPI.init(sdcard.toString(), langMap.get(this.fromLang));
 
         Log.d("ImageToText", sdcard.toString());
         baseAPI.setImage(img);
 
         String text = baseAPI.getUTF8Text();
+
         baseAPI.end();
         img.recycle();
 
-        return text;
+        // replace unicode shit that appears sometimes
+        return text.replaceAll("[^\\p{L}\\p{Nd}]+", " ");
 
+    }
+
+    private static Map<Language, String> langMap = new HashMap<Language, String>();
+    static {
+        langMap.put(Language.ENGLISH, "eng");
+        langMap.put(Language.SPANISH, "spa");
+        langMap.put(Language.FRENCH, "fra");
     }
 
     @Override

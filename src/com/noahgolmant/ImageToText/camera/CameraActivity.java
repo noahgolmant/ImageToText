@@ -17,10 +17,14 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 import com.googlecode.leptonica.android.JpegIO;
+import com.memetix.mst.language.Language;
+import com.memetix.mst.translate.Translate;
 import com.noahgolmant.ImageToText.DecodeTask;
 import com.noahgolmant.ImageToText.R;
 import com.noahgolmant.ImageToText.ResultActivity;
+import com.noahgolmant.ImageToText.TranslateTask;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -28,10 +32,10 @@ import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -40,7 +44,7 @@ import java.util.List;
 /**
  * Created by Noah on 7/5/2014.
  */
-public class CameraActivity extends Activity implements View.OnClickListener, View.OnTouchListener, Camera.PictureCallback, DecodeTask.DecodeInterface {
+public class CameraActivity extends Activity implements View.OnClickListener, View.OnTouchListener, Camera.PictureCallback, DecodeTask.DecodeInterface, TranslateTask.TranslateInterface {
 
     private static int MIN_SELECTION_AREA = 400;
 
@@ -229,7 +233,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
         originalImg.recycle();
 
-        DecodeTask decoder = new DecodeTask(this);
+        DecodeTask decoder = new DecodeTask(this, (Language)getIntent().getSerializableExtra("from"));
         decoder.intent = this;
         decoder.execute(currentImage);
 
@@ -247,37 +251,44 @@ public class CameraActivity extends Activity implements View.OnClickListener, Vi
 
     @Override
     public void useExtractedText(String text) {
-        Intent resultIntent = new Intent();
-        resultIntent.setClass(this, ResultActivity.class);
+
         this.extractedText = text;
+
+        //Translate.setClientId("+iMJBJCzSshvoA0riBfTNo5GM5ypLnCNJrA3YzZp0fQ");
+        //Translate.setClientSecret("jhfNdRP3dcmlzHcQ0VG+fXmMB3af0DjxyxFEG41UtsQ=");
+
+        Language from = (Language)getIntent().getSerializableExtra("from");
+        Language to = (Language)getIntent().getSerializableExtra("to");
+
+        TranslateTask trans = new TranslateTask(this, from.name(), to.name());
+        trans.intent = this;
+        trans.execute(text);
+
+        /*String translatedText = text;
+
+        try {
+            //translatedText = Translate.execute(text, from, to);
+            translatedText = translate(from.name(), to.name(), text);
+
+            resultIntent.putExtra("extracted", translatedText);
+            this.startActivity(resultIntent);
+
+            Log.d("ImageToText", "USED EXTRACTED: " + text);
+            Log.d("ImageToText", "USED TRANSLATED: " + translatedText);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Failed to translate text.", Toast.LENGTH_LONG);
+            resultIntent.putExtra("extracted", translatedText);
+            this.startActivity(resultIntent);
+        }*/
+
+    }
+
+    @Override
+    public void useTranslation(String text) {
+        Intent resultIntent = new Intent(this, ResultActivity.class);
         resultIntent.putExtra("extracted", text);
-
-        // begin image pre-processing by applying threshold and inverting the colors
-//        Mat mat = new Mat();
-//        Utils.bitmapToMat(currentImage, mat);
-//
-//        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
-//
-//        double alpha = 1.3;
-//        double beta = 6.0;
-//        for (int i = 0; i < mat.rows(); i++) {
-//            for (int j = 0; j < mat.cols(); j++) {
-//                double[] val = new double[] { alpha * mat.get(i,j)[0] + beta };
-//
-//                mat.put(i,j, val);
-//            }
-//        }
-//
-//        //Highgui.imwrite(params[0].getPath(), mat);
-//        //Bitmap img = BitmapFactory.decodeFile(params[0].getPath()).copy(Bitmap.Config.ARGB_8888, true);
-//
-//        // set the bitmap back to our modified matrix
-//        Utils.matToBitmap(mat, currentImage);
-
-        //resultIntent.putExtra("image", currentImage);
-
         this.startActivity(resultIntent);
-        Log.d("ImageToText", "USED EXTRACTED: " + text);
 
         super.onPause();
         if (camera != null) {

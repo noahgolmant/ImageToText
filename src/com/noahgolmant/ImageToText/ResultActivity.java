@@ -7,6 +7,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import com.memetix.mst.language.Language;
+import com.memetix.mst.translate.Translate;
 
 /**
  * Created by Noah on 8/28/2014.
@@ -24,7 +26,12 @@ public class ResultActivity extends Activity {
         //resultView = (ImageView) findViewById(R.id.resultImageView);
         textView = (EditText) findViewById(R.id.resultTextView);
         //resultView.setImageBitmap((Bitmap) getIntent().getParcelableExtra("image"));
-        textView.setText(getIntent().getStringExtra("extracted"));
+
+        String text = getIntent().getStringExtra("extracted");
+
+
+
+        textView.setText(text);
 
         textView.selectAll();
         textView.requestFocus();

@@ -36,9 +36,8 @@ public class DownloadTask extends AsyncTask<String, Integer, String> {
         this.context = context;
     }
 
-    // interface to interact with main intent
     public interface DownloadInterface {
-        void useDownload();
+        public void useResult();
     }
 
     public DownloadInterface intent = null;
@@ -164,7 +163,7 @@ public class DownloadTask extends AsyncTask<String, Integer, String> {
         else
             Toast.makeText(context,"File downloaded", Toast.LENGTH_SHORT).show();
 
-        intent.useDownload();
+        intent.useResult();
     }
 
 }

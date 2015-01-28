@@ -12,7 +12,9 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.*;
+import com.memetix.mst.language.Language;
 import com.noahgolmant.ImageToText.camera.CameraActivity;
+import org.apache.http.util.LangUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.opencv.android.OpenCVLoader;
@@ -21,14 +23,19 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
-public class ITTActivity extends Activity implements DownloadTask.DownloadInterface {
+public class ITTActivity extends Activity implements DownloadTask.DownloadInterface, View.OnClickListener {
 
     /**
      * Widgets and items interacted with in the main window.
      */
-    //private Button startNewPhotoButton;
+    private Button startButton;
     private String loadedJSON;
+
+    private Spinner fromSpinner;
+    private Spinner toSpinner;
 
     /**
      * Listeners to call when a button or object is selected.
@@ -52,25 +59,6 @@ public class ITTActivity extends Activity implements DownloadTask.DownloadInterf
 
         loadedJSON = loadJSONFromAsset();
 
-        try {
-            JSONObject json = new JSONObject(loadedJSON);
-            String urlString  = json.getString("English");
-
-            String fileName = urlString.substring(urlString.lastIndexOf('/') + 1).replace(".gz", "");
-
-            File data = new File(Environment.getExternalStorageDirectory().toString() + "/tessdata/" + fileName);
-
-            if(!data.exists()) {
-                DownloadTask initDownload = new DownloadTask(this);
-                initDownload.intent = this;
-                initDownload.execute("English");
-            } else {
-                startGuidedPhoto();
-            }
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
     }
 
     private String loadJSONFromAsset() {
@@ -125,54 +113,79 @@ public class ITTActivity extends Activity implements DownloadTask.DownloadInterf
 
     private void initializeWidgets() {
         // Initialize widgets
-        //startNewPhotoButton = (Button) findViewById(R.id.startNewPhotoButton);
-        //previousImageListView   = (ListView) findViewById(R.id.listView);
-
-        //clearPhotoButton = (Button) findViewById(R.id.clearPhotosButton);
-
-        // Init ListView array adapter that manages the ListView's data
-        //previousImageAdapter = new ImageAdapter(this, R.layout.image_row_entry, previousImages);
-        //previousImageListView.setAdapter(previousImageAdapter);
+        this.startButton = (Button) findViewById(R.id.startButton);
+        this.fromSpinner = (Spinner) findViewById(R.id.fromSpinner);
+        this.toSpinner = (Spinner) findViewById(R.id.toSpinner);
     }
 
     private void initializeListeners() {
-        // Listener called when the "new photo" button is pressed down.
-        /*newPhotoButtonListener = new View.OnClickListener() {
+
+        this.startButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startGuidedPhoto();
             }
-        };
-        startNewPhotoButton.setOnClickListener(newPhotoButtonListener);*/
+        });
 
-//        clearPhotoButton.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                clearPhotoEntries();
-//            }
-//        });
+    }
 
-        // Listener called when a previous picture in the picture's ListView is selected.
-        // This will go to the rotate activity unless we already have aligned and cropped it.
-//        previousImageListView.setOnItemClickListener(new ListView.OnItemClickListener() {
-//            @Override
-//            public void onItemClick(AdapterView<?> parent, View view,
-//                                    int position, long id) {
-//                startGuidedPhoto(previousImages.get(position));
-//            }
-//        });
+    @Override
+    public void onClick(View v) {
+
+
+        try {
+            String fromString = String.valueOf(fromSpinner.getSelectedItem());
+            JSONObject json = new JSONObject(loadedJSON);
+            String urlString  = json.getString(fromString);
+
+            String fileName = urlString.substring(urlString.lastIndexOf('/') + 1).replace(".gz", "");
+
+            File data = new File(Environment.getExternalStorageDirectory().toString() + "/tessdata/" + fileName);
+
+            if(!data.exists()) {
+                DownloadTask initDownload = new DownloadTask(this);
+                initDownload.intent = this;
+                initDownload.execute(fromString);
+
+                startButton.setEnabled(false);
+            } else {
+                startGuidedPhoto();
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 
     private void startGuidedPhoto() {
-        //Intent guideIntent = new Intent(this, GuideActivity.class);
+
+        String fromString = String.valueOf(fromSpinner.getSelectedItem());
+        String toString = String.valueOf(toSpinner.getSelectedItem());
+
+        Language fromLang = langMap.get(fromString);
+        Language toLang = langMap.get(toString);
+
+
+
         Intent guideIntent = new Intent();
         guideIntent.setClassName(getApplicationContext(), "com.noahgolmant.ImageToText.camera.CameraActivity");
+
+        guideIntent.putExtra("from", fromLang);
+        guideIntent.putExtra("to", toLang);
         super.onResume();
         startActivity(guideIntent);
     }
 
+    private static Map<String, Language> langMap = new HashMap<String, Language>();
+    static {
+        langMap.put("English", Language.ENGLISH);
+        langMap.put("Spanish", Language.SPANISH);
+        langMap.put("French", Language.FRENCH);
+    }
+
+
     @Override
-    public void useDownload() {
-        startGuidedPhoto();
+    public void useResult() {
+        startButton.setEnabled(true);
     }
 }

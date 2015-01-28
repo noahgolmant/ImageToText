@@ -17,6 +17,7 @@
     <orderEntry type="library" exported="" name="tess-two" level="project" />
     <orderEntry type="library" name="tess-two (2)" level="project" />
     <orderEntry type="library" name="OpenCV" level="project" />
+    <orderEntry type="library" name="microsoft-translator-java-api-0.6.2-jar-with-dependencies" level="project" />
   </component>
 </module>
 

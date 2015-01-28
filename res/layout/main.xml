@@ -7,6 +7,45 @@
     <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
+        <Spinner
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/fromSpinner"
+                android:layout_marginTop="64dp" android:layout_alignParentTop="true"
+                android:layout_centerHorizontal="true" android:spinnerMode="dialog"
+                android:entries="@array/language_array"
+                android:prompt="@string/language_prompt" android:visibility="visible"
+                android:background="@android:color/black" />
+        <Spinner
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/toSpinner" android:layout_below="@+id/fromSpinner" android:layout_alignParentStart="true"
+                android:layout_marginTop="59dp" android:spinnerMode="dialog"
+                android:entries="@array/language_array"
+                android:prompt="@string/language_prompt"
+                android:background="@android:color/black" />
+        <Button
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Take Photo"
+                android:id="@+id/startButton" android:layout_below="@+id/toSpinner" android:layout_centerHorizontal="true"
+                android:layout_marginTop="109dp"/>
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:text="From"
+                android:id="@+id/textView" android:layout_alignParentTop="true" android:layout_alignParentStart="true"
+                android:layout_marginLeft="26dp" android:layout_marginTop="35dp"
+                android:layout_alignEnd="@+id/startButton" android:textColor="@android:color/black"/>
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:text="To"
+                android:id="@+id/textView2" android:layout_below="@+id/fromSpinner"
+                android:layout_alignStart="@+id/textView" android:layout_marginTop="36dp" android:textColor="@android:color/black"/>
     </RelativeLayout>
 </LinearLayout>
 
